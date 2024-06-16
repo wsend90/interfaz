@@ -8,8 +8,8 @@ import requests
 import tempfile
 
 # URLs públicas de los modelos en Google Cloud Storage
-MODELO_SEGMENTACION_URL = "https://storage.googleapis.com/modelos_interfaz/Hope.h5"
-MODELO_CLASIFICACION_URL = "https://storage.googleapis.com/modelos_interfaz/Clas.h5"
+MODELO_SEGMENTACION_URL = "https://storage.cloud.google.com/modelos_interfaz/Hope.h5"
+MODELO_CLASIFICACION_URL = "https://storage.cloud.google.com/modelos_interfaz/Clas.h5"
 
 # Función para cargar la imagen y preprocesarla
 def load_and_preprocess_image(image_path, target_size=(256, 256)):
