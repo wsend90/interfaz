@@ -32,16 +32,17 @@ def obtener_region_ventriculos(segmented_image):
         x, y, w, h = cv2.boundingRect(largest_contour)
         cropped_image = segmented_array[y:y+h, x:x+w]
         resized_image = cv2.resize(cropped_image, (224, 224))
-        return Image.fromarray(resized_image), mask
+        return Image.fromarray(resized_image), mask, largest_contour
     else:
-        return None, None  # Devuelve None si no se encontraron contornos
+        return None, None, None  # Devuelve None si no se encontraron contornos
 
-# Función para aplicar la máscara a la imagen original
-def aplicar_mascara(imagen_original, mascara):
+# Función para dibujar contorno en la imagen original
+def dibujar_contorno(imagen_original, contorno):
     original_array = np.array(imagen_original)
-    mascara_resized = cv2.resize(mascara, (original_array.shape[1], original_array.shape[0]))
-    masked_array = cv2.bitwise_and(original_array, original_array, mask=mascara_resized.astype(np.uint8))
-    return Image.fromarray(masked_array)
+    if len(original_array.shape) == 2:
+        original_array = cv2.cvtColor(original_array, cv2.COLOR_GRAY2RGB)
+    cv2.drawContours(original_array, [contorno], -1, (0, 0, 255), 2)
+    return Image.fromarray(original_array)
 
 # Interfaz de Streamlit
 st.set_page_config(page_title="Diagnóstico Cardíaco", page_icon=":heart:")
@@ -113,12 +114,12 @@ if uploaded_file is not None:
         st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
 
         # Obtener la región de los ventrículos y la máscara
-        imagen_recortada, mascara = obtener_region_ventriculos(segmented_image)
+        imagen_recortada, mascara, contorno = obtener_region_ventriculos(segmented_image)
 
         if imagen_recortada is not None:  # Verifica si se encontró la región
-            # Aplicar la máscara a la imagen original
-            imagen_mascarada = aplicar_mascara(image, mascara)
-            st.image(imagen_mascarada, caption='Imagen Original con Máscara Aplicada', use_column_width=True)
+            # Dibujar el contorno en la imagen original
+            imagen_contorno = dibujar_contorno(image, contorno)
+            st.image(imagen_contorno, caption='Imagen Original con Contorno del Ventrículo', use_column_width=True)
 
             # Preprocesamiento adicional para el modelo de clasificación
             img_array = np.array(imagen_recortada)
