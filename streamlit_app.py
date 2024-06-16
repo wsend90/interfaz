@@ -151,11 +151,11 @@ if uploaded_file is not None:
             clase_predicha = np.argmax(clasificacion_output)
             resultado = "Diástole" if clase_predicha == 0 else "Sístole"
 
-            # Mostrar resultado en blanco
-            st.markdown(f'<div class="resultado">{resultado}</div>', unsafe_allow_html=True)
-
             # Dibujar contorno en la imagen original
             imagen_con_contorno = dibujar_contorno(image, contorno)
             st.image(imagen_con_contorno, caption='Imagen con Contorno', use_column_width=True)
+
+            # Mostrar resultado en blanco
+            st.markdown(f'<div class="resultado">{resultado}</div>', unsafe_allow_html=True)
         else:
             st.error("No se pudo encontrar la región de los ventrículos en la imagen.")
