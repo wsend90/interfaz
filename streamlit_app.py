@@ -116,9 +116,6 @@ if uploaded_file is not None:
         imagen_recortada, mascara = obtener_region_ventriculos(segmented_image)
 
         if imagen_recortada is not None:  # Verifica si se encontró la región
-            # Mostrar la imagen recortada
-            st.image(imagen_recortada, caption='Región de Ventrículos', use_column_width=True)
-
             # Aplicar la máscara a la imagen original
             imagen_mascarada = aplicar_mascara(image, mascara)
             st.image(imagen_mascarada, caption='Imagen Original con Máscara Aplicada', use_column_width=True)
