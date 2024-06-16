@@ -3,5 +3,3 @@ tensorflow==3.3.3
 pillow
 numpy
 opencv-python
-altair
-pandas
