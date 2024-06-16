@@ -8,10 +8,9 @@ import requests
 import tempfile
 import h5py
 
-
 # URLs públicas de los modelos en Google Cloud Storage
-MODELO_SEGMENTACION_URL = "https://storage.cloud.google.com/modelos_interfaz/Hope.h5"
-MODELO_CLASIFICACION_URL = "https://storage.cloud.google.com/modelos_interfaz/Clas.h5"
+MODELO_SEGMENTACION_URL = "https://storage.googleapis.com/modelos_interfaz/Hope.h5"
+MODELO_CLASIFICACION_URL = "https://storage.googleapis.com/modelos_interfaz/Clas.h5"
 
 # Función para cargar la imagen y preprocesarla
 def load_and_preprocess_image(image_path, target_size=(256, 256)):
@@ -43,39 +42,23 @@ st.title("Diagnóstico Cardíaco Asistido por IA")
 st.subheader("Segmentación y Clasificación Ventricular")
 
 # Estilos personalizados (CSS)
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #333333;
-    }
-    .stButton button {
-        background-color: #4CAF50;
-        color: white;
-    }
-    .stTitle {
-        text-align: center;
-        color: #2196F3;
-    }
-    .stSubheader {
-        text-align: center;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# ... (tu código CSS)
 
-# Cargar modelos directamente desde las URLs (modificado)
+# Cargar modelos directamente desde las URLs
 with st.spinner("Cargando modelos..."):
-    # Descargar el modelo de segmentación
+    # Descargar y cargar el modelo de segmentación
     with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
         with requests.get(MODELO_SEGMENTACION_URL, stream=True) as r:
-            r.raise_for_status()  # Verificar si la descarga fue exitosa
+            r.raise_for_status()
             for chunk in r.iter_content(chunk_size=8192):
                 temp_file.write(chunk)
-        modelo_segmentacion = models.load_model(temp_file.name)
+        
+        # Abrir el archivo temporal con h5py y cargar el modelo
+        with h5py.File(temp_file.name, 'r') as hf:
+            modelo_segmentacion = models.load_model(hf)
 
-    modelo_clasificacion = models.load_model(MODELO_CLASIFICACION_URL)  # No es necesario descargar, ya que funciona
+    # Cargar el modelo de clasificación directamente desde la URL
+    modelo_clasificacion = models.load_model(MODELO_CLASIFICACION_URL)
 
 
 # Cargar la imagen
