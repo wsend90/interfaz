@@ -130,7 +130,6 @@ if uploaded_file is not None:
         segmented_output = modelo_segmentacion.predict(preprocessed_image)
         segmented_image = (segmented_output[0, :, :, 0] > 0.5).astype(np.uint8) * 255
         segmented_image = Image.fromarray(segmented_image).convert('L')
-        st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
 
         # Preprocesamiento para la clasificación
         imagen_recortada, mask, contorno = obtener_region_ventriculos(segmented_image, image.size)
