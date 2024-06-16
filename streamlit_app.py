@@ -39,7 +39,8 @@ def obtener_region_ventriculos(segmented_image):
 # Función para aplicar la máscara a la imagen original
 def aplicar_mascara(imagen_original, mascara):
     original_array = np.array(imagen_original)
-    masked_array = cv2.bitwise_and(original_array, original_array, mask=mascara)
+    mascara_resized = cv2.resize(mascara, (original_array.shape[1], original_array.shape[0]))
+    masked_array = cv2.bitwise_and(original_array, original_array, mask=mascara_resized.astype(np.uint8))
     return Image.fromarray(masked_array)
 
 # Interfaz de Streamlit
