@@ -70,29 +70,22 @@ st.markdown(
 with st.spinner("Cargando modelos..."):
     # ... (Descargar y cargar modelos de segmentación y clasificación) ...
 
-# Cargar la imagen
-uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
+# Cargar la imagen ... (Mostrar imagen original) ...
 
 if uploaded_file is not None:
-    # Mostrar imagen original
-    image = Image.open(uploaded_file)
-    st.image(image, caption='Imagen Original', use_column_width=True)
+    # ... (Segmentación) ...
 
-    with st.spinner("Procesando..."):
-        # Segmentación
-        preprocessed_image = load_and_preprocess_image(uploaded_file)
-        segmented_output = modelo_segmentacion.predict(preprocessed_image)
-        segmented_image = (segmented_output[0, :, :, 0] > 0.4).astype(np.uint8) * 255  # Ajustar umbral si es necesario
-        segmented_image = Image.fromarray(segmented_image).convert('L')
+    # Crear imagen combinada (máscara + original)
+    image_array = np.array(image)
+    segmented_array = np.array(segmented_image)
 
-        # Crear imagen combinada (máscara + original)
-        image_array = np.array(image)
-        segmented_array = np.array(segmented_image)
+    # Aplicar la máscara a la imagen original
+    combined_image = np.where(segmented_array[:, :, None] > 0, image_array, 0)
+    combined_image = Image.fromarray(combined_image)
 
-        # Aplicar la máscara a la imagen original
-        combined_image = np.where(segmented_array[:, :, None] > 0, image_array, 0)
-        combined_image = Image.fromarray(combined_image)
-
+    # Mostrar imágenes
+    st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
+    st.image(combined_image, caption='Imagen Combinada', use_column_width=True)  # Nueva imagen
         # Mostrar imágenes
         st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
         st.image(combined_image, caption='Imagen Combinada', use_column_width=True)
