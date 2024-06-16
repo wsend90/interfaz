@@ -6,6 +6,8 @@ from tensorflow.keras import models
 import cv2
 import requests
 import tempfile
+import h5py
+
 
 # URLs públicas de los modelos en Google Cloud Storage
 MODELO_SEGMENTACION_URL = "https://storage.cloud.google.com/modelos_interfaz/Hope.h5"
