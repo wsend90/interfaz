@@ -1,1 +1,7 @@
 streamlit==1.26.0
+tensorflow==3.3.3
+pillow
+numpy
+opencv-python
+altair
+pandas
