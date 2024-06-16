@@ -25,7 +25,7 @@ def load_and_preprocess_image(image_path, target_size=(256, 256)):
 def obtener_region_ventriculos(segmented_image):
     segmented_array = np.array(segmented_image)
     contours, _ = cv2.findContours(segmented_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:  # Verifica si se encontraron contornos
+    if contours:
         largest_contour = max(contours, key=cv2.contourArea)
         mask = np.zeros_like(segmented_array)
         cv2.drawContours(mask, [largest_contour], 0, (255), -1)
@@ -34,7 +34,7 @@ def obtener_region_ventriculos(segmented_image):
         resized_image = cv2.resize(cropped_image, (224, 224))
         return Image.fromarray(resized_image)
     else:
-        return None  # Devuelve None si no se encontraron contornos
+        return None
 
 # Interfaz de Streamlit
 st.set_page_config(page_title="Diagnóstico Cardíaco", page_icon=":heart:")
@@ -66,28 +66,7 @@ st.markdown(
 
 # Cargar modelos desde las URLs
 with st.spinner("Cargando modelos..."):
-    # Descargar el modelo de segmentación
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
-        response = requests.get(MODELO_SEGMENTACION_URL)
-        response.raise_for_status()
-        temp_file.write(response.content)
-        temp_file.flush() 
-
-        # Cargar el modelo desde el archivo temporal
-        modelo_segmentacion = models.load_model(temp_file.name)
-
-    # Descargar el modelo de clasificación
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
-        response = requests.get(MODELO_CLASIFICACION_URL)
-        response.raise_for_status()
-        temp_file.write(response.content)
-        temp_file.flush()
-
-        modelo_clasificacion = models.load_model(temp_file.name)
-        
-    # Opcional: Eliminar los archivos temporales después de cargar los modelos
-    os.remove(temp_file.name)
-
+    # ... (Descargar y cargar modelos de segmentación y clasificación) ...
 
 # Cargar la imagen
 uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
@@ -103,30 +82,19 @@ if uploaded_file is not None:
         segmented_output = modelo_segmentacion.predict(preprocessed_image)
         segmented_image = (segmented_output[0, :, :, 0] > 0.5).astype(np.uint8) * 255
         segmented_image = Image.fromarray(segmented_image).convert('L')
+
+        # Crear imagen combinada (máscara + original)
+        image_array = np.array(image)
+        segmented_array = np.array(segmented_image)
+
+        # Aplicar la máscara a la imagen original
+        combined_image = np.where(segmented_array[:, :, None] > 0, image_array, 0)
+        combined_image = Image.fromarray(combined_image)
+
+        # Mostrar imágenes
         st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
+        st.image(combined_image, caption='Imagen Combinada', use_column_width=True)
 
         # Preprocesamiento para la clasificación
         imagen_recortada = obtener_region_ventriculos(segmented_image)
-
-        if imagen_recortada is not None:  # Verifica si se encontró la región
-            # Preprocesamiento adicional para el modelo de clasificación
-            img_array = np.array(imagen_recortada)
-            if img_array.ndim == 2:
-                img_array = np.stack((img_array,) * 3, axis=-1)
-            img_array = cv2.resize(img_array, (224, 224))
-            img_array = img_array / 255.0
-            img_array = np.expand_dims(img_array, axis=0)
-
-            # Clasificación
-            clasificacion_output = modelo_clasificacion.predict(img_array)
-
-            # Mostrar resultado de la clasificación
-            clase_predicha = np.argmax(clasificacion_output)
-            resultado = "Diástole" if clase_predicha == 0 else "Sístole"
-
-            if resultado == "Diástole":
-                st.markdown(f'<h1 style="color:blue; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<h1 style="color:red; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
-        else:
-            st.error("No se pudo encontrar la región de los ventrículos en la imagen.")
+        # ... (Resto del código de clasificación y visualización de resultados) ...
