@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import models
 import cv2
+import requests
+import tempfile
 
 # URLs públicas de los modelos en Google Cloud Storage
 MODELO_SEGMENTACION_URL = "https://storage.googleapis.com/modelos_interfaz/Hope.h5"
@@ -61,10 +63,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Cargar modelos directamente desde las URLs
+# Cargar modelos directamente desde las URLs (modificado)
 with st.spinner("Cargando modelos..."):
-    modelo_segmentacion = models.load_model(MODELO_SEGMENTACION_URL)
-    modelo_clasificacion = models.load_model(MODELO_CLASIFICACION_URL)
+    # Descargar el modelo de segmentación
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
+        with requests.get(MODELO_SEGMENTACION_URL, stream=True) as r:
+            r.raise_for_status()  # Verificar si la descarga fue exitosa
+            for chunk in r.iter_content(chunk_size=8192):
+                temp_file.write(chunk)
+        modelo_segmentacion = models.load_model(temp_file.name)
+
+    modelo_clasificacion = models.load_model(MODELO_CLASIFICACION_URL)  # No es necesario descargar, ya que funciona
+
 
 # Cargar la imagen
 uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
