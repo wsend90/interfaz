@@ -21,22 +21,26 @@ def load_and_preprocess_image(image_path, target_size=(256, 256)):
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
-# Función para obtener la región de los ventrículos (corregida)
+# Función para obtener la región de los ventrículos y la máscara
 def obtener_region_ventriculos(segmented_image):
     segmented_array = np.array(segmented_image)
     contours, _ = cv2.findContours(segmented_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    if contours:
+    if contours:  # Verifica si se encontraron contornos
         largest_contour = max(contours, key=cv2.contourArea)
         mask = np.zeros_like(segmented_array)
         cv2.drawContours(mask, [largest_contour], 0, (255), -1)
         x, y, w, h = cv2.boundingRect(largest_contour)
         cropped_image = segmented_array[y:y+h, x:x+w]
         resized_image = cv2.resize(cropped_image, (224, 224))
-        return Image.fromarray(resized_image)
+        return Image.fromarray(resized_image), mask
     else:
-        st.error("No se pudieron encontrar contornos de ventrículos en la imagen segmentada.")  # Mostrar mensaje de error
-        return None
+        return None, None  # Devuelve None si no se encontraron contornos
+
+# Función para aplicar la máscara a la imagen original
+def aplicar_mascara(imagen_original, mascara):
+    original_array = np.array(imagen_original)
+    masked_array = cv2.bitwise_and(original_array, original_array, mask=mascara)
+    return Image.fromarray(masked_array)
 
 # Interfaz de Streamlit
 st.set_page_config(page_title="Diagnóstico Cardíaco", page_icon=":heart:")
@@ -68,32 +72,56 @@ st.markdown(
 
 # Cargar modelos desde las URLs
 with st.spinner("Cargando modelos..."):
-    # ... (Descargar y cargar modelos de segmentación y clasificación) ...
+    # Descargar el modelo de segmentación
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
+        response = requests.get(MODELO_SEGMENTACION_URL)
+        response.raise_for_status()
+        temp_file.write(response.content)
+        temp_file.flush()
 
-# Cargar la imagen ... (Mostrar imagen original) ...
+        # Cargar el modelo desde el archivo temporal
+        modelo_segmentacion = models.load_model(temp_file.name)
+
+    # Descargar el modelo de clasificación
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
+        response = requests.get(MODELO_CLASIFICACION_URL)
+        response.raise_for_status()
+        temp_file.write(response.content)
+        temp_file.flush()
+
+        modelo_clasificacion = models.load_model(temp_file.name)
+
+    # Opcional: Eliminar los archivos temporales después de cargar los modelos
+    os.remove(temp_file.name)
+
+
+# Cargar la imagen
+uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # ... (Segmentación) ...
+    # Mostrar imagen original
+    image = Image.open(uploaded_file)
+    st.image(image, caption='Imagen Original', use_column_width=True)
 
-    # Crear imagen combinada (máscara + original)
-    image_array = np.array(image)
-    segmented_array = np.array(segmented_image)
-
-    # Aplicar la máscara a la imagen original
-    combined_image = np.where(segmented_array[:, :, None] > 0, image_array, 0)
-    combined_image = Image.fromarray(combined_image)
-
-    # Mostrar imágenes
-    st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
-    st.image(combined_image, caption='Imagen Combinada', use_column_width=True)  # Nueva imagen
-        # Mostrar imágenes
+    with st.spinner("Procesando..."):
+        # Segmentación
+        preprocessed_image = load_and_preprocess_image(uploaded_file)
+        segmented_output = modelo_segmentacion.predict(preprocessed_image)
+        segmented_image = (segmented_output[0, :, :, 0] > 0.5).astype(np.uint8) * 255
+        segmented_image = Image.fromarray(segmented_image).convert('L')
         st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
-        st.image(combined_image, caption='Imagen Combinada', use_column_width=True)
 
-        # Preprocesamiento para la clasificación
-        imagen_recortada = obtener_region_ventriculos(segmented_image)
+        # Obtener la región de los ventrículos y la máscara
+        imagen_recortada, mascara = obtener_region_ventriculos(segmented_image)
 
         if imagen_recortada is not None:  # Verifica si se encontró la región
+            # Mostrar la imagen recortada
+            st.image(imagen_recortada, caption='Región de Ventrículos', use_column_width=True)
+
+            # Aplicar la máscara a la imagen original
+            imagen_mascarada = aplicar_mascara(image, mascara)
+            st.image(imagen_mascarada, caption='Imagen Original con Máscara Aplicada', use_column_width=True)
+
             # Preprocesamiento adicional para el modelo de clasificación
             img_array = np.array(imagen_recortada)
             if img_array.ndim == 2:
