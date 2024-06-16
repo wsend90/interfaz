@@ -21,10 +21,11 @@ def load_and_preprocess_image(image_path, target_size=(256, 256)):
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
-# Función para obtener la región de los ventrículos
+# Función para obtener la región de los ventrículos (corregida)
 def obtener_region_ventriculos(segmented_image):
     segmented_array = np.array(segmented_image)
     contours, _ = cv2.findContours(segmented_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
     if contours:
         largest_contour = max(contours, key=cv2.contourArea)
         mask = np.zeros_like(segmented_array)
@@ -34,6 +35,7 @@ def obtener_region_ventriculos(segmented_image):
         resized_image = cv2.resize(cropped_image, (224, 224))
         return Image.fromarray(resized_image)
     else:
+        st.error("No se pudieron encontrar contornos de ventrículos en la imagen segmentada.")  # Mostrar mensaje de error
         return None
 
 # Interfaz de Streamlit
@@ -66,27 +68,7 @@ st.markdown(
 
 # Cargar modelos desde las URLs
 with st.spinner("Cargando modelos..."):
-    # Descargar el modelo de segmentación
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
-        response = requests.get(MODELO_SEGMENTACION_URL)
-        response.raise_for_status()
-        temp_file.write(response.content)
-        temp_file.flush()
-
-        # Cargar el modelo desde el archivo temporal
-        modelo_segmentacion = models.load_model(temp_file.name)
-
-    # Descargar el modelo de clasificación
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
-        response = requests.get(MODELO_CLASIFICACION_URL)
-        response.raise_for_status()
-        temp_file.write(response.content)
-        temp_file.flush()
-
-        modelo_clasificacion = models.load_model(temp_file.name)
-
-    # Opcional: Eliminar los archivos temporales después de cargar los modelos
-    os.remove(temp_file.name)
+    # ... (Descargar y cargar modelos de segmentación y clasificación) ...
 
 # Cargar la imagen
 uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
@@ -100,7 +82,7 @@ if uploaded_file is not None:
         # Segmentación
         preprocessed_image = load_and_preprocess_image(uploaded_file)
         segmented_output = modelo_segmentacion.predict(preprocessed_image)
-        segmented_image = (segmented_output[0, :, :, 0] > 0.5).astype(np.uint8) * 255
+        segmented_image = (segmented_output[0, :, :, 0] > 0.4).astype(np.uint8) * 255  # Ajustar umbral si es necesario
         segmented_image = Image.fromarray(segmented_image).convert('L')
 
         # Crear imagen combinada (máscara + original)
