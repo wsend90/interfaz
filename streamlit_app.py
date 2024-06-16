@@ -4,12 +4,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import models
 import cv2
-from google.cloud import storage
 
-# Configuración de Google Cloud Storage
-bucket_name = "modelos_interfaz"
-storage_client = storage.Client()
-bucket = storage_client.bucket(bucket_name)
+# URLs públicas de los modelos en Google Cloud Storage
+MODELO_SEGMENTACION_URL = "https://storage.googleapis.com/modelos_interfaz/Hope.h5"
+MODELO_CLASIFICACION_URL = "https://storage.googleapis.com/modelos_interfaz/Clas.h5"
 
 # Función para cargar la imagen y preprocesarla
 def load_and_preprocess_image(image_path, target_size=(256, 256)):
@@ -22,13 +20,18 @@ def load_and_preprocess_image(image_path, target_size=(256, 256)):
 
 # Función para obtener la región de los ventrículos
 def obtener_region_ventriculos(segmented_image):
-    # ... (tu código existente para obtener_region_ventriculos)
+    segmented_array = np.array(segmented_image)
+    contours, _ = cv2.findContours(segmented_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    largest_contour = max(contours, key=cv2.contourArea)
 
-# Cargar modelos desde Google Cloud Storage
-def load_model_from_gcs(model_name):
-    blob = bucket.blob(model_name)
-    blob.download_to_filename(model_name)
-    return models.load_model(model_name)
+    mask = np.zeros_like(segmented_array)
+    cv2.drawContours(mask, [largest_contour], 0, (255), -1)
+
+    x, y, w, h = cv2.boundingRect(largest_contour)
+    cropped_image = segmented_array[y:y+h, x:x+w]
+    resized_image = cv2.resize(cropped_image, (224, 224))
+
+    return Image.fromarray(resized_image)
 
 # Interfaz de Streamlit
 st.set_page_config(page_title="Diagnóstico Cardíaco", page_icon=":heart:")
@@ -36,12 +39,32 @@ st.title("Diagnóstico Cardíaco Asistido por IA")
 st.subheader("Segmentación y Clasificación Ventricular")
 
 # Estilos personalizados (CSS)
-# ... (tu código CSS)
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #333333;
+    }
+    .stButton button {
+        background-color: #4CAF50;
+        color: white;
+    }
+    .stTitle {
+        text-align: center;
+        color: #2196F3;
+    }
+    .stSubheader {
+        text-align: center;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-# Cargar modelos desde GCS
+# Cargar modelos directamente desde las URLs
 with st.spinner("Cargando modelos..."):
-    modelo_segmentacion = load_model_from_gcs("Hope.h5")
-    modelo_clasificacion = load_model_from_gcs("Clas.h5")
+    modelo_segmentacion = models.load_model(MODELO_SEGMENTACION_URL)
+    modelo_clasificacion = models.load_model(MODELO_CLASIFICACION_URL)
 
 # Cargar la imagen
 uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
@@ -64,7 +87,11 @@ if uploaded_file is not None:
 
         # Preprocesamiento adicional para el modelo de clasificación
         img_array = np.array(imagen_recortada)
-        # ... (resto de tu código de preprocesamiento)
+        if img_array.ndim == 2:
+            img_array = np.stack((img_array,)*3, axis=-1)
+        img_array = cv2.resize(img_array, (224, 224))
+        img_array = img_array / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
 
         # Clasificación
         clasificacion_output = modelo_clasificacion.predict(img_array)
@@ -77,3 +104,4 @@ if uploaded_file is not None:
         st.markdown(f'<h1 style="color:blue; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
     else:
         st.markdown(f'<h1 style="color:red; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
+
