@@ -22,7 +22,7 @@ def load_and_preprocess_image(image_path, target_size=(256, 256)):
     return img_array
 
 # Función para obtener la región de los ventrículos y la máscara
-def obtener_region_ventriculos(segmented_image):
+def obtener_region_ventriculos(segmented_image, original_size):
     segmented_array = np.array(segmented_image)
     contours, _ = cv2.findContours(segmented_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if contours:  # Verifica si se encontraron contornos
@@ -32,6 +32,13 @@ def obtener_region_ventriculos(segmented_image):
         x, y, w, h = cv2.boundingRect(largest_contour)
         cropped_image = segmented_array[y:y+h, x:x+w]
         resized_image = cv2.resize(cropped_image, (224, 224))
+
+        # Escalar contorno a la imagen original
+        scale_x = original_size[0] / segmented_image.size[0]
+        scale_y = original_size[1] / segmented_image.size[1]
+        largest_contour = np.array(largest_contour) * [scale_x, scale_y]
+        largest_contour = largest_contour.astype(np.int32)
+
         return Image.fromarray(resized_image), mask, largest_contour
     else:
         return None, None, None  # Devuelve None si no se encontraron contornos
@@ -114,7 +121,7 @@ if uploaded_file is not None:
         st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
 
         # Obtener la región de los ventrículos y la máscara
-        imagen_recortada, mascara, contorno = obtener_region_ventriculos(segmented_image)
+        imagen_recortada, mascara, contorno = obtener_region_ventriculos(segmented_image, image.size)
 
         if imagen_recortada is not None:  # Verifica si se encontró la región
             # Dibujar el contorno en la imagen original
