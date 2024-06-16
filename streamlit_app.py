@@ -66,7 +66,27 @@ st.markdown(
 
 # Cargar modelos desde las URLs
 with st.spinner("Cargando modelos..."):
-    # ... (Descargar y cargar modelos de segmentación y clasificación) ...
+    # Descargar el modelo de segmentación
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
+        response = requests.get(MODELO_SEGMENTACION_URL)
+        response.raise_for_status()
+        temp_file.write(response.content)
+        temp_file.flush()
+
+        # Cargar el modelo desde el archivo temporal
+        modelo_segmentacion = models.load_model(temp_file.name)
+
+    # Descargar el modelo de clasificación
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_file:
+        response = requests.get(MODELO_CLASIFICACION_URL)
+        response.raise_for_status()
+        temp_file.write(response.content)
+        temp_file.flush()
+
+        modelo_clasificacion = models.load_model(temp_file.name)
+
+    # Opcional: Eliminar los archivos temporales después de cargar los modelos
+    os.remove(temp_file.name)
 
 # Cargar la imagen
 uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
@@ -97,4 +117,26 @@ if uploaded_file is not None:
 
         # Preprocesamiento para la clasificación
         imagen_recortada = obtener_region_ventriculos(segmented_image)
-        # ... (Resto del código de clasificación y visualización de resultados) ...
+
+        if imagen_recortada is not None:  # Verifica si se encontró la región
+            # Preprocesamiento adicional para el modelo de clasificación
+            img_array = np.array(imagen_recortada)
+            if img_array.ndim == 2:
+                img_array = np.stack((img_array,) * 3, axis=-1)
+            img_array = cv2.resize(img_array, (224, 224))
+            img_array = img_array / 255.0
+            img_array = np.expand_dims(img_array, axis=0)
+
+            # Clasificación
+            clasificacion_output = modelo_clasificacion.predict(img_array)
+
+            # Mostrar resultado de la clasificación
+            clase_predicha = np.argmax(clasificacion_output)
+            resultado = "Diástole" if clase_predicha == 0 else "Sístole"
+
+            if resultado == "Diástole":
+                st.markdown(f'<h1 style="color:blue; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<h1 style="color:red; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
+        else:
+            st.error("No se pudo encontrar la región de los ventrículos en la imagen.")
