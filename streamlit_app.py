@@ -16,7 +16,12 @@ MODELO_CLASIFICACION_URL = "https://storage.googleapis.com/modelos-interfaz/Clas
 def load_and_preprocess_image(image_path, target_size=(256, 256)):
     img = Image.open(image_path).convert('L')
     img = img.resize(target_size)
-    img_array = np.array(img) / 255.0
+    img_array = np.array(img)
+    
+    # Aplicar equalización del histograma
+    img_array = cv2.equalizeHist(img_array)
+    
+    img_array = img_array / 255.0
     img_array = np.expand_dims(img_array, axis=-1)
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
