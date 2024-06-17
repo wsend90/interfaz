@@ -16,15 +16,10 @@ MODELO_CLASIFICACION_URL = "https://storage.googleapis.com/modelos-interfaz/Clas
 def load_and_preprocess_image(image_path, target_size=(256, 256)):
     img = Image.open(image_path).convert('L')
     img = img.resize(target_size)
-    img_array = np.array(img)
-    
-    # Aplicar equalización del histograma
-    equalized_img_array = cv2.equalizeHist(img_array)
-    
-    img_array = equalized_img_array / 255.0
+    img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=-1)
     img_array = np.expand_dims(img_array, axis=0)
-    return img_array, Image.fromarray(equalized_img_array)
+    return img_array
 
 # Función para obtener la región de los ventrículos y la máscara
 def obtener_region_ventriculos(segmented_image, original_size):
@@ -131,11 +126,7 @@ if uploaded_file is not None:
 
     with st.spinner("Procesando..."):
         # Segmentación
-        preprocessed_image, equalized_image = load_and_preprocess_image(uploaded_file)
-        
-        # Mostrar imagen con realce
-        st.image(equalized_image, caption='Imagen con Equalización del Histograma', use_column_width=True)
-        
+        preprocessed_image = load_and_preprocess_image(uploaded_file)
         segmented_output = modelo_segmentacion.predict(preprocessed_image)
         segmented_image = (segmented_output[0, :, :, 0] > 0.5).astype(np.uint8) * 255
         segmented_image = Image.fromarray(segmented_image).convert('L')
