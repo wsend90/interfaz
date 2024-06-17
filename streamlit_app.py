@@ -16,12 +16,7 @@ MODELO_CLASIFICACION_URL = "https://storage.googleapis.com/modelos-interfaz/Clas
 def load_and_preprocess_image(image_path, target_size=(256, 256)):
     img = Image.open(image_path).convert('L')
     img = img.resize(target_size)
-    img_array = np.array(img)
-    
-    # Aplicar equalización del histograma
-    img_array = cv2.equalizeHist(img_array)
-    
-    img_array = img_array / 255.0
+    img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=-1)
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
@@ -34,8 +29,6 @@ def obtener_region_ventriculos(segmented_image, original_size):
         largest_contour = max(contours, key=cv2.contourArea)
         mask = np.zeros_like(segmented_array)
         cv2.drawContours(mask, [largest_contour], 0, (255), -1)
-        
-        # Obtener el bounding box del contorno más grande
         x, y, w, h = cv2.boundingRect(largest_contour)
         cropped_image = segmented_array[y:y+h, x:x+w]
         resized_image = cv2.resize(cropped_image, (224, 224))
@@ -43,25 +36,19 @@ def obtener_region_ventriculos(segmented_image, original_size):
         # Escalar contorno a la imagen original
         scale_x = original_size[0] / segmented_image.size[0]
         scale_y = original_size[1] / segmented_image.size[1]
-        scaled_contour = np.array([[[int(point[0][0] * scale_x), int(point[0][1] * scale_y)]] for point in largest_contour])
+        largest_contour = np.array(largest_contour) * [scale_x, scale_y]
+        largest_contour = largest_contour.astype(np.int32)
 
-        return Image.fromarray(resized_image), mask, scaled_contour
+        return Image.fromarray(resized_image), mask, largest_contour
     else:
         return None, None, None  # Devuelve None si no se encontraron contornos
 
 # Función para dibujar contorno en la imagen original
 def dibujar_contorno(imagen_original, contorno):
     original_array = np.array(imagen_original)
-    
-    # Convertir a RGB si es necesario
     if len(original_array.shape) == 2:
         original_array = cv2.cvtColor(original_array, cv2.COLOR_GRAY2RGB)
-    elif original_array.shape[2] == 4:  # Si tiene un canal alfa, convertir a RGB
-        original_array = cv2.cvtColor(original_array, cv2.COLOR_RGBA2RGB)
-    
-    # Cambiar el color de la línea aquí (formato BGR)
-    cv2.drawContours(original_array, [contorno], -1, (0, 0, 255), 2)  # Color rojo (BGR: (0, 0, 255))
-    
+    cv2.drawContours(original_array, [contorno], -1, (0, 0, 255), 2)
     return Image.fromarray(original_array)
 
 # Interfaz de Streamlit
@@ -86,11 +73,6 @@ st.markdown(
     }
     .stSubheader {
         text-align: center;
-    }
-    .resultado {
-        color: white;
-        text-align: center;
-        font-size: 24px;
     }
     </style>
     """,
@@ -121,6 +103,7 @@ with st.spinner("Cargando modelos..."):
     # Opcional: Eliminar los archivos temporales después de cargar los modelos
     os.remove(temp_file.name)
 
+
 # Cargar la imagen
 uploaded_file = st.file_uploader("Sube una imagen de resonancia magnética cardíaca", type=["jpg", "png", "jpeg"])
 
@@ -135,11 +118,16 @@ if uploaded_file is not None:
         segmented_output = modelo_segmentacion.predict(preprocessed_image)
         segmented_image = (segmented_output[0, :, :, 0] > 0.5).astype(np.uint8) * 255
         segmented_image = Image.fromarray(segmented_image).convert('L')
+        st.image(segmented_image, caption='Imagen Segmentada', use_column_width=True)
 
-        # Preprocesamiento para la clasificación
-        imagen_recortada, mask, contorno = obtener_region_ventriculos(segmented_image, image.size)
+        # Obtener la región de los ventrículos y la máscara
+        imagen_recortada, mascara, contorno = obtener_region_ventriculos(segmented_image, image.size)
 
         if imagen_recortada is not None:  # Verifica si se encontró la región
+            # Dibujar el contorno en la imagen original
+            imagen_contorno = dibujar_contorno(image, contorno)
+            st.image(imagen_contorno, caption='Imagen Original con Contorno del Ventrículo', use_column_width=True)
+
             # Preprocesamiento adicional para el modelo de clasificación
             img_array = np.array(imagen_recortada)
             if img_array.ndim == 2:
@@ -155,11 +143,9 @@ if uploaded_file is not None:
             clase_predicha = np.argmax(clasificacion_output)
             resultado = "Diástole" if clase_predicha == 0 else "Sístole"
 
-            # Dibujar contorno en la imagen original
-            imagen_con_contorno = dibujar_contorno(image, contorno)
-            st.image(imagen_con_contorno, caption='Imagen con Contorno', use_column_width=True)
-
-            # Mostrar resultado en blanco
-            st.markdown(f'<div class="resultado">{resultado}</div>', unsafe_allow_html=True)
+            if resultado == "Diástole":
+                st.markdown(f'<h1 style="color:blue; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<h1 style="color:red; text-align:center;">Clasificación: {resultado}</h1>', unsafe_allow_html=True)
         else:
             st.error("No se pudo encontrar la región de los ventrículos en la imagen.")
